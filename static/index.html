@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Valet</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Valet</h1>
+    <p class="tagline">Your personal memory, structured. Tell me anything about yourself.</p>
+    <div id="summary" class="summary"></div>
+  </header>
+
+  <main>
+    <section class="chat">
+      <div id="messages" class="messages"></div>
+      <form id="msg-form" class="composer">
+        <input id="msg-input" type="text" placeholder="e.g. I did 3 workouts this week, goal is a sub-2h half marathon" autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+    </section>
+
+    <aside class="facts-panel">
+      <div class="facts-header">
+        <h2>Captured facts</h2>
+        <div class="filters">
+          <input id="filter-q" type="text" placeholder="search facts…" />
+          <select id="filter-cat"><option value="">all categories</option></select>
+        </div>
+      </div>
+      <div id="facts-list" class="facts-list"></div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

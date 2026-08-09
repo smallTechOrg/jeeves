@@ -1,0 +1,13 @@
+# Secrets & local state
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+*.sqlite
+chroma_store/
+mem0_history.db
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
