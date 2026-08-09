@@ -19,6 +19,10 @@ _raw = dotenv_values(ENV_PATH)
 NVIDIA_API_KEY = _raw.get("NVIDIA_API_KEY", "") or os.environ.get("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL = _raw.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_CHAT_MODEL = _raw.get("NVIDIA_CHAT_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+# Extraction runs on every message. On this NVIDIA account ONLY the 120B reliably extracts
+# structured facts (49B/30B models return empty facts — silently losing memory). So
+# extraction uses 120B too; Mem0 indexing is backgrounded to keep capture latency low.
+NVIDIA_EXTRACT_MODEL = _raw.get("NVIDIA_EXTRACT_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NVIDIA_EMBED_MODEL = _raw.get("NVIDIA_EMBED_MODEL", "nvidia/nemotron-3-embed-1b")
 
 VALET_DB_PATH = REPO_ROOT / str(_raw.get("VALET_DB_PATH", "./valet.db"))
