@@ -53,3 +53,18 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 0; min-hei
 .fact .conf.lo { color: var(--warn); }
 .fact .txt { font-size: 13px; line-height: 1.4; }
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 10px; }
+
+/* Phase 3: derived attributes, status badges, verify/edit */
+.fact .attrs { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; }
+.fact .attr { font-size: 11px; background: var(--panel); border: 1px solid var(--border); color: var(--accent); padding: 1px 7px; border-radius: 8px; }
+.fact .fact-actions { margin-top: 8px; display: flex; gap: 8px; }
+.fact-btn { font-size: 12px; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.fact-btn:hover { background: var(--accent-soft); }
+.badge { font-size: 10px; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; letter-spacing: 0.4px; font-weight: 600; }
+.badge-active { background: rgba(88,166,255,0.18); color: #58a6ff; }
+.badge-extracted { background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.badge-verified { background: rgba(102,187,106,0.18); color: #66bb6a; }
+.badge-superseded { background: rgba(240,98,90,0.16); color: #ef6262; text-decoration: line-through; }
+.verified-tag { font-size: 11px; color: #66bb6a; }
+.fact.status-superseded { opacity: 0.55; }
+.edit-input { width: 100%; box-sizing: border-box; font-size: 13px; padding: 4px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--panel); color: var(--text); }

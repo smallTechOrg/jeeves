@@ -49,9 +49,20 @@ def add_message(text: str) -> dict:
             fact_text=f.fact,
             entity=f.entity,
             confidence=f.confidence,
-            status="extracted",
+            status="active",
             source_message=text,
+            quantity=f.quantity,
+            unit=f.unit,
+            period=f.period,
+            fact_date=f.fact_date,
         )
+        # Conflict detection: a newer fact that matches an existing active one on
+        # (category, entity, period) supersedes the older one. This is the visible
+        # "limits of memory" moment — memory must reconcile contradictory statements.
+        candidates = db.facts_by_key(f.category, f.entity, f.period)
+        for c in candidates:
+            if c["id"] != fid and c["status"] != "superseded":
+                db.supersede_fact(c["id"], fid)
         row = db.get_fact(fid)
         if row:
             mirrored.append({
@@ -61,6 +72,10 @@ def add_message(text: str) -> dict:
                 "fact_text": row["fact_text"],
                 "confidence": row["confidence"],
                 "status": row["status"],
+                "quantity": row["quantity"],
+                "unit": row["unit"],
+                "period": row["period"],
+                "fact_date": row["fact_date"],
             })
 
     # Index in Mem0 off the request path (Phase 2 retrieval). Not user-blocking.
@@ -82,6 +97,22 @@ def list_facts(
     limit: int = 200,
 ) -> list[dict]:
     return db.list_facts(category=category, entity=entity, status=status, q=q, limit=limit)
+
+
+def verify_fact(fact_id: int) -> bool:
+    """Mark a fact as verified by the owner (confirmed true)."""
+    return db.update_fact(fact_id, status="verified")
+
+
+def edit_fact(
+    fact_id: int,
+    *,
+    fact_text: Optional[str] = None,
+    category: Optional[str] = None,
+    entity: Optional[str] = None,
+) -> bool:
+    """Owner-edited correction of a stored fact."""
+    return db.update_fact(fact_id, fact_text=fact_text, category=category, entity=entity)
 
 
 def fact_summary() -> dict:

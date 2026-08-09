@@ -25,3 +25,10 @@ class MessageOut(BaseModel):
 
 class AskIn(BaseModel):
     question: str
+
+
+class FactEditIn(BaseModel):
+    fact_text: str | None = None
+    category: str | None = None
+    entity: str | None = None
+

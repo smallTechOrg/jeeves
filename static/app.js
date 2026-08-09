@@ -45,19 +45,78 @@ function renderFacts(facts) {
   }
   for (const f of facts) {
     const card = document.createElement("div");
-    card.className = "fact";
+    const status = f.status || "active";
+    card.className = "fact status-" + status;
     const conf = Math.round((f.confidence || 0) * 100);
     const confCls = conf >= 60 ? "hi" : "lo";
     const ent = f.entity ? `<span class="ent">· ${escapeHtml(f.entity)}</span>` : "";
+
+    // Derived attributes (the relational/normalized part)
+    const attrs = [];
+    if (f.quantity != null && f.unit) attrs.push(`${f.quantity} ${escapeHtml(f.unit)}`);
+    else if (f.quantity != null) attrs.push(`${f.quantity}`);
+    if (f.period) attrs.push(`<span class="period">${escapeHtml(f.period)}</span>`);
+    if (f.fact_date) attrs.push(`<span class="fdate">${escapeHtml(f.fact_date)}</span>`);
+    const attrHtml = attrs.length
+      ? `<div class="attrs">` + attrs.map(a => `<span class="attr">${a}</span>`).join("") + `</div>`
+      : "";
+
+    const statusBadge = `<span class="badge badge-${status}">${status}</span>`;
+    const verifyBtn = (status === "verified")
+      ? `<span class="verified-tag">✓ verified</span>`
+      : `<button class="fact-btn verify" data-id="${f.id}">Verify</button>`;
+
     card.innerHTML =
       `<div class="meta">` +
         `<span class="cat">${escapeHtml(f.category)}</span>` +
         ent +
+        statusBadge +
         `<span class="conf ${confCls}">${conf}% sure</span>` +
       `</div>` +
-      `<div class="txt">${escapeHtml(f.fact_text)}</div>`;
+      `<div class="txt">${escapeHtml(f.fact_text)}</div>` +
+      attrHtml +
+      `<div class="fact-actions">` +
+        verifyBtn +
+        `<button class="fact-btn edit" data-id="${f.id}">Edit</button>` +
+      `</div>`;
     factsList.appendChild(card);
   }
+
+  // wire verify + edit buttons
+  factsList.querySelectorAll(".fact-btn.verify").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-id");
+      await fetch(`/api/facts/${id}/verify`, { method: "POST" });
+      refreshFacts();
+    });
+  });
+  factsList.querySelectorAll(".fact-btn.edit").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      const card = btn.closest(".fact");
+      const txtEl = card.querySelector(".txt");
+      const current = txtEl.textContent;
+      const inputEl = document.createElement("input");
+      inputEl.type = "text";
+      inputEl.value = current;
+      inputEl.className = "edit-input";
+      txtEl.replaceWith(inputEl);
+      inputEl.focus();
+      const save = async () => {
+        const nv = inputEl.value.trim();
+        if (nv && nv !== current) {
+          await fetch(`/api/facts/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fact_text: nv }),
+          });
+        }
+        refreshFacts();
+      };
+      inputEl.addEventListener("blur", save);
+      inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter") inputEl.blur(); });
+    });
+  });
 }
 
 function escapeHtml(s) {

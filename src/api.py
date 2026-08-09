@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory
 from . import db
-from .schemas import MessageIn, MessageOut, AskIn
+from .schemas import MessageIn, MessageOut, AskIn, FactEditIn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = REPO_ROOT / "static"
@@ -58,6 +58,27 @@ def post_ask(payload: AskIn):
 @app.get("/api/summary")
 def get_summary():
     return memory.fact_summary()
+
+
+@app.post("/api/facts/{fact_id}/verify")
+def post_verify(fact_id: int):
+    ok = memory.verify_fact(fact_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="fact not found")
+    return {"ok": True, "id": fact_id, "status": "verified"}
+
+
+@app.patch("/api/facts/{fact_id}")
+def patch_fact(fact_id: int, payload: FactEditIn):
+    ok = memory.edit_fact(
+        fact_id,
+        fact_text=payload.fact_text,
+        category=payload.category,
+        entity=payload.entity,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="fact not found")
+    return {"ok": True, "id": fact_id}
 
 
 # Serve the SPA at /
