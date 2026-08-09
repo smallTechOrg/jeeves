@@ -35,3 +35,30 @@ Run started: 2026-08-09 ~21:49 PT
 
 - **`clarify` worked fine** this run; no fallback to plain text needed. Intake covered 5
   rounds + technical in one structured batch.
+
+- **Smaller NVIDIA models silently DROP facts.** Tried `nemotron-3-nano-30b` and
+  `llama-3.3-nemotron-super-49b` as a faster extractor (1-2s vs 120B's 5-18s). Both returned
+  `{"facts":[]}` on inputs the 120B extracted fine. For a memory agent, dropped facts are the
+  worst failure, so reverted to 120B. **Lesson:** for *extraction* engines, reliability beats
+  speed — a faster model that loses memory is unusable. Keep the slow-but-correct model.
+
+- **Retrieval needs stemming.** Phase 2 ask failed to find "Goal" facts for a "goals" question
+  because exact token match treated "goal" != "goals" / "workout" != "workouts". Added a tiny
+  stemmer (strip s/ing/ed). **Lesson:** keyword retrieval over LLM-extracted text must normalize
+  plurals or it silently misses obvious matches.
+
+- **Conflict key must ignore the LLM `entity`.** Phase 3 conflict detection initially matched on
+  (category, entity, period), but the extractor assigned inconsistent entities ("workouts" vs None)
+  for the same recurring fact, so matches failed and nothing superseded. Switched to keying on
+  (category, period) primarily. **Lesson:** LLM-generated entity fields are too noisy to be a
+  primary join key — use them only as a secondary tiebreaker.
+
+- **SQLite column migration without data loss.** `db.migrate()` uses `PRAGMA table_info` +
+  conditional `ALTER TABLE ADD COLUMN` so existing dev DBs gain the new derived/conflict columns
+  on next boot. **Lesson:** add columns additively; never recreate the table.
+
+- **Background-server stale watch notifications.** The Hermes desktop kept emitting
+  "Application startup complete" lines from long-killed server PIDs after each restart during the
+  build. They are zombie echoes; the live PID is always the last-started one. **Lesson:** when a
+  watch pattern fires post-kill, check `curl /health` on the known live PID rather than acting on
+  the notification's PID.

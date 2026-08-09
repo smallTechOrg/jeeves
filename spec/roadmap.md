@@ -60,20 +60,24 @@ facts from Phase 1.
 
 ---
 
-## Phase 3 — Memory hygiene (the limits demo)
+## Phase 3 — Memory hygiene (the limits demo) ✅ DONE
 **Goal:** Fact verification (mark verified), conflict detection (later message contradicts
 → `conflicted`/`superseded`), and an editable structured view of all facts.
 
 **Slices:** conflict detection in `add_message`, `POST /api/facts/<id>/verify`,
-`PATCH /api/facts/<id>`, full facts browser UI.
+`PATCH /api/facts/<id>`, full facts browser UI + derived attributes.
 
-**Gate:** add "I did 5 workouts this week" → earlier "3 workouts" shows `superseded`;
-verify a fact → status flips to `verified`.
+**Gate (passed):** add "I did 5 workouts this week" → earlier "3 workouts" shows `superseded`;
+verify a fact → status flips to `verified`; derived attributes (qty/unit/period) populated.
+
+**Deferred to later phases:** conversation history, export, settings page (Phase 4).
 
 ---
 
-## Phase 4 — Polish & persistence
+## Phase 4 — Polish & persistence (next)
 **Goal:** conversation history view, export (JSON/CSV of facts), README run docs,
 settings page for model/slug overrides.
+
+**Slices:** `GET /api/export?fmt=csv|json`, history store + UI, settings UI.
 
 **Gate:** export returns a CSV of all facts; README run command boots the app.
