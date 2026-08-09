@@ -36,11 +36,11 @@ def get_memory() -> Memory:
             vector_store = {
                 "provider": "supabase",
                 "config": {
-                    "connection_string": str(config.JEEVES_DB_URL) if config._IS_POSTGRES else config.SUPABASE_URL,
+                    # mem0 2.x Supabase backend takes ONLY a postgres connection string
+                    # (no separate url/key). Requires the `vecs` package.
+                    "connection_string": str(config.JEEVES_DB_URL),
                     "collection_name": "jeeves_memories",
                     "embedding_model_dims": 1024,  # nvidia/nemotron-3-embed-1b dimensionality
-                    "supabase_url": config.SUPABASE_URL,
-                    "supabase_key": config.SUPABASE_KEY,
                 },
             }
         else:
