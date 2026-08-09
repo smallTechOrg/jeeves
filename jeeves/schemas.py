@@ -1,4 +1,4 @@
-"""Pydantic API schemas for Valet."""
+"""Pydantic API schemas for Jeeves."""
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -31,4 +31,8 @@ class FactEditIn(BaseModel):
     fact_text: str | None = None
     category: str | None = None
     entity: str | None = None
+
+
+class ChatIn(BaseModel):
+    text: str
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, asdict
+from datetime import date
 from typing import Optional
 
 from openai import OpenAI
@@ -16,12 +17,15 @@ from openai import OpenAI
 from . import config
 
 _SYSTEM = (
-    "You are the memory extractor for 'Valet', a personal agent that stores factual, "
+    "You are the memory extractor for 'Jeeves', a personal agent that stores factual, "
     "structured memory about its owner. Given a short message from the owner, extract "
     "discrete, self-contained FACTS. For each fact provide:\n"
     "- category: a short noun describing the type of fact. Prefer one of: "
     + ", ".join(config.SEED_CATEGORIES)
-    + ". Invent a NEW concise category only if none fit (e.g. 'Travel', 'Hobby').\n"
+    + ". Invent a NEW concise category only if none fit (e.g. 'Travel', 'Hobby', 'Mood'). "
+    "Capture qualitative signals too — a stated mood or feeling (e.g. 'Owner feels exhausted "
+    "today', 'Owner is anxious about the demo') is valuable memory, use category 'Mood' or "
+    "'Feeling'.\n"
     "- entity: the specific subject the fact is about (a person, goal, activity, thing), "
     "or null if not applicable.\n"
     "- fact: a clean, atomic, factual statement in third person about the owner, suitable "
@@ -34,7 +38,14 @@ _SYSTEM = (
     "- period: the time window the fact refers to (e.g. 'this week', 'today', '2026-08', "
     "'weekend'), else null.\n"
     "- fact_date: the ISO date (YYYY-MM-DD) the fact is about if clearly stated or "
-    "impliable from 'today/yesterday', else null.\n"
+    "impliable from 'today/yesterday/last week'. TODAY's date is "
+    + date.today().isoformat()
+    + " — if the message says 'today' or is a present-tense statement with no other date, "
+    "use that. Otherwise null.\n"
+    "ONLY extract a fact when it is a CONCRETE, DURABLE claim the owner would want remembered "
+    "later: an action taken, a goal, a preference, a measurement, a plan, a relationship, an "
+    "event, a habit, or a stated mood/feeling. If the message is purely transactional chit-chat "
+    "with no claim worth remembering (e.g. 'hi', 'ok'), return {\"facts\": []}.\n"
     "Return ONLY a JSON object: {\"facts\": [ {category, entity, fact, confidence, "
     "quantity, unit, period, fact_date}, ... ]}. "
     "If the message contains no extractable facts, return {\"facts\": []}. "
@@ -113,6 +124,13 @@ def extract_facts(message: str) -> list[ExtractedFact]:
         except (TypeError, ValueError):
             conf = 0.5
         conf = max(0.0, min(1.0, conf))
+        fdate = _to_str(item.get("fact_date"))
+        # Default: if the fact clearly refers to today (or is a present-tense statement with
+        # no other date mentioned), stamp it with today's date so time-based queries work.
+        if not fdate and (period := _to_str(item.get("period"))):
+            low = period.lower()
+            if low in ("today", "tonight", "this morning", "this evening", "this afternoon"):
+                fdate = date.today().isoformat()
         facts.append(ExtractedFact(
             category=cat,
             fact=fact_text,
@@ -121,6 +139,6 @@ def extract_facts(message: str) -> list[ExtractedFact]:
             quantity=_to_float(item.get("quantity")),
             unit=_to_str(item.get("unit")),
             period=_to_str(item.get("period")),
-            fact_date=_to_str(item.get("fact_date")),
+            fact_date=fdate,
         ))
     return facts

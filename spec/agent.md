@@ -1,17 +1,17 @@
-# Valet — Agentic Design (`spec/agent.md`)
+# Jeeves — Agentic Design (`spec/agent.md`)
 
-This file is the **AI-native lens** on Valet. It records which agentic patterns are in
+This file is the **AI-native lens** on Jeeves. It records which agentic patterns are in
 play, why, and where the product deliberately exposes the *limits* of agentic memory.
 
 ## Is AI a capability here? — YES (required by the user: "You have to use Mem0")
-Valet is fundamentally an agentic-memory system. Mem0 is the memory substrate; the LLM
+Jeeves is fundamentally an agentic-memory system. Mem0 is the memory substrate; the LLM
 does fact-extraction and grounded answering. So this is not "no AI" — it is AI-centric.
 
 ## Patterns in use
 
 ### 1. Extract-and-mirror (core loop)
 - **Pattern:** Every user utterance is sent to Mem0 `add()`. Mem0's LLM extracts discrete
-  facts. Valet then parses the returned facts and **mirrors** them into a relational SQLite
+  facts. Jeeves then parses the returned facts and **mirrors** them into a relational SQLite
   table. The vector store (Chroma) handles fuzzy recall; the SQL table handles precise,
   filterable, queryable fact retrieval.
 - **Why:** The user explicitly wants *structured relational* memory, not just semantic
@@ -35,14 +35,14 @@ does fact-extraction and grounded answering. So this is not "no AI" — it is AI
   and fails. Hiding the extraction is the opposite of the goal.
 
 ### 4. Category / entity auto-classification
-- **Pattern:** During extraction, Valet asks the LLM (via Mem0's extraction prompt
+- **Pattern:** During extraction, Jeeves asks the LLM (via Mem0's extraction prompt
   augmentation) to tag each fact with a `category` and `entity`. Categories are dynamic —
   the LLM invents sensible new ones rather than being forced into a fixed enum — matching
   the user's "dynamic, based on how I want it structured" intent.
 - **Why:** Keeps the relational schema flexible while still queryable.
 
-## Deliberate non-patterns (what Valet does NOT do)
-- **No autonomous background agents.** Valet only acts on explicit user input. It does not
+## Deliberate non-patterns (what Jeeves does NOT do)
+- **No autonomous background agents.** Jeeves only acts on explicit user input. It does not
   proactively crawl or infer without a trigger.
 - **No multi-agent debate / planner.** A single extraction + a single grounded answer is
   enough for Phase 1. Multi-step planning is deferred.

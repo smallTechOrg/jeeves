@@ -1,4 +1,4 @@
-"""Valet configuration — loads .env, exposes typed settings.
+"""Jeeves configuration — loads .env, exposes typed settings.
 
 Absolute path to .env is resolved from the repo root so sandboxed runners can't
 silently report a missing key (pitfall §16).
@@ -25,9 +25,9 @@ NVIDIA_CHAT_MODEL = _raw.get("NVIDIA_CHAT_MODEL", "nvidia/nemotron-3-super-120b-
 NVIDIA_EXTRACT_MODEL = _raw.get("NVIDIA_EXTRACT_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NVIDIA_EMBED_MODEL = _raw.get("NVIDIA_EMBED_MODEL", "nvidia/nemotron-3-embed-1b")
 
-VALET_DB_PATH = REPO_ROOT / str(_raw.get("VALET_DB_PATH", "./valet.db"))
-VALET_HOST = str(_raw.get("VALET_HOST", "127.0.0.1"))
-VALET_PORT = int(str(_raw.get("VALET_PORT", "8000")))
+JEEVES_DB_PATH = REPO_ROOT / str(_raw.get("JEEVES_DB_PATH", "./jeeves.db"))
+JEEVES_HOST = str(_raw.get("JEEVES_HOST", "127.0.0.1"))
+JEEVES_PORT = int(str(_raw.get("JEEVES_PORT", "8000")))
 
 # Mem0's local Chroma store lives next to the DB.
 CHROMA_PATH = REPO_ROOT / "chroma_store"
@@ -41,4 +41,5 @@ USER_ID = "owner"
 SEED_CATEGORIES = [
     "Identity", "Goal", "Plan", "Workout", "Nutrition", "Health",
     "Preference", "Relationship", "Work", "Finance", "Learning", "Event",
+    "Mood", "Feeling",
 ]

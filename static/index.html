@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Valet</title>
+  <title>Jeeves</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <header>
-    <h1>Valet</h1>
+    <h1>Jeeves</h1>
     <p class="tagline">Your personal memory, structured. Tell me anything about yourself.</p>
     <div id="summary" class="summary"></div>
   </header>
@@ -17,13 +17,8 @@
     <section class="chat">
       <div id="messages" class="messages"></div>
 
-      <div class="ask-box">
-        <input id="ask-input" type="text" placeholder="Ask Valet anything about yourself…" autocomplete="off" />
-        <button id="ask-btn" type="button">Ask</button>
-      </div>
-
-      <form id="msg-form" class="composer">
-        <input id="msg-input" type="text" placeholder="e.g. I did 3 workouts this week, goal is a sub-2h half marathon" autocomplete="off" />
+      <form id="chat-form" class="composer">
+        <input id="chat-input" type="text" placeholder="Tell Jeeves anything — a fact, a question, or just vent…" autocomplete="off" />
         <button type="submit">Send</button>
       </form>
     </section>

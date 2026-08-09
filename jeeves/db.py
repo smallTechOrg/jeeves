@@ -1,4 +1,4 @@
-"""SQLite relational mirror of Valet's extracted facts.
+"""SQLite relational mirror of Jeeves's extracted facts.
 
 This is the structured, queryable store the user explicitly asked for. Mem0 owns semantic
 recall; this owns precise, filterable, relational fact storage.
@@ -42,8 +42,8 @@ def _now() -> str:
 
 
 def _connect() -> sqlite3.Connection:
-    Path(config.VALET_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(config.VALET_DB_PATH))
+    Path(config.JEEVES_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(config.JEEVES_DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

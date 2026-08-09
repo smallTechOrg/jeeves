@@ -1,8 +1,8 @@
 "use strict";
 
 const messagesEl = document.getElementById("messages");
-const form = document.getElementById("msg-form");
-const input = document.getElementById("msg-input");
+const form = document.getElementById("chat-form");
+const input = document.getElementById("chat-input");
 const factsList = document.getElementById("facts-list");
 const filterQ = document.getElementById("filter-q");
 const filterCat = document.getElementById("filter-cat");
@@ -16,9 +16,16 @@ function addBubble(text, kind) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function addAnswerBubble(answer, citations) {
+function addAnswerBubble(answer, citations, intent) {
   const b = document.createElement("div");
   b.className = "bubble answer";
+  const intentBadge = intent
+    ? `<span class="intent intent-${intent}">${intent}</span>`
+    : "";
+  const head = document.createElement("div");
+  head.className = "answer-head";
+  head.innerHTML = intentBadge;
+  b.appendChild(head);
   const p = document.createElement("div");
   p.className = "answer-text";
   p.textContent = answer;
@@ -30,6 +37,21 @@ function addAnswerBubble(answer, citations) {
       ": " + citations.map(x => x.category).join(", ");
     b.appendChild(c);
   }
+  messagesEl.appendChild(b);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addCapturedBubble(facts, intent) {
+  const b = document.createElement("div");
+  b.className = "bubble answer";
+  const head = document.createElement("div");
+  head.className = "answer-head";
+  head.innerHTML = `<span class="intent intent-fact">${intent || "fact"}</span> <span class="captured-n">Captured ${facts.length} fact${facts.length === 1 ? "" : "s"}</span>`;
+  b.appendChild(head);
+  const p = document.createElement("div");
+  p.className = "answer-text";
+  p.textContent = facts.map(f => (f.fact_text || f.category) + (f.fact_date ? ` (${f.fact_date})` : "")).join(" · ");
+  b.appendChild(p);
   messagesEl.appendChild(b);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -158,24 +180,32 @@ form.addEventListener("submit", async (e) => {
   input.value = "";
   input.disabled = true;
   form.querySelector("button").disabled = true;
-  addBubble("Capturing…", "sys");
+  addBubble("Thinking…", "sys");
   try {
-    const res = await fetch("/api/message", {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
-    // replace the "Capturing…" bubble with a result summary
+    // replace the "Thinking…" bubble
     const bubbles = messagesEl.querySelectorAll(".bubble.sys");
     const last = bubbles[bubbles.length - 1];
     if (last) last.remove();
-    const n = (data.facts || []).length;
-    addBubble(
-      `Captured ${n} fact${n === 1 ? "" : "s"}` +
-      (data.stored_in_mem0 ? "." : " (semantic store unavailable — kept in local DB)."),
-      "sys"
-    );
+
+    const intent = data.intent;
+    if (intent === "vent") {
+      addAnswerBubble(data.answer, [], "vent");
+    } else if (intent === "question") {
+      addAnswerBubble(data.answer, data.citations || [], "question");
+    } else {
+      // fact or feeling (both stored)
+      const label = intent === "feeling" ? "feeling" : "fact";
+      addCapturedBubble(data.facts || [], label);
+      if (data.answer) {
+        addAnswerBubble(data.answer, data.citations || [], label);
+      }
+    }
     await refreshFacts();
   } catch (err) {
     addBubble("Error: " + err.message, "sys");
@@ -188,40 +218,6 @@ form.addEventListener("submit", async (e) => {
 
 filterQ.addEventListener("input", debounce(refreshFacts, 250));
 filterCat.addEventListener("change", refreshFacts);
-
-// --- Ask Valet ---
-const askInput = document.getElementById("ask-input");
-const askBtn = document.getElementById("ask-btn");
-
-async function doAsk() {
-  const q = askInput.value.trim();
-  if (!q) return;
-  addBubble(q, "user");
-  askInput.value = "";
-  askBtn.disabled = true;
-  askInput.disabled = true;
-  addBubble("Thinking…", "sys");
-  try {
-    const res = await fetch("/api/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q }),
-    });
-    const data = await res.json();
-    const bubbles = messagesEl.querySelectorAll(".bubble.sys");
-    const last = bubbles[bubbles.length - 1];
-    if (last) last.remove();
-    addAnswerBubble(data.answer, data.citations || []);
-  } catch (err) {
-    addBubble("Error: " + err.message, "sys");
-  } finally {
-    askBtn.disabled = false;
-    askInput.disabled = false;
-    askInput.focus();
-  }
-}
-askBtn.addEventListener("click", doAsk);
-askInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAsk(); });
 
 function debounce(fn, ms) {
   let t;

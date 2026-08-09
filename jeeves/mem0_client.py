@@ -1,7 +1,7 @@
-"""Shared Mem0 Memory instance (semantic layer) for Valet.
+"""Shared Mem0 Memory instance (semantic layer) for Jeeves.
 
 Mem0 does semantic recall only — it returns cleaned memory strings, not structured facts.
-Valet's own extraction (see extractor.py) produces the structured relational facts that
+Jeeves's own extraction (see extractor.py) produces the structured relational facts that
 land in SQLite. Mem0 is used for: (a) durable semantic storage of each message, and
 (b) similarity search when answering questions (Phase 2).
 

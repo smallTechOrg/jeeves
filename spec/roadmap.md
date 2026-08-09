@@ -1,4 +1,4 @@
-# Valet — Roadmap (phased, user-testable)
+# Jeeves — Roadmap (phased, user-testable)
 
 Each phase ends with a **gate**: a real command I run and read the output of, then a
 human testing step (you click around the live URL; you never run commands).
@@ -9,7 +9,7 @@ PR base: `main`. The build never commits to `main` or merges PRs.
 ---
 
 ## Phase 1 — Capture & Query (the smallest testable win)
-**Goal:** You talk to Valet in a web chat; it extracts structured facts into SQLite; you
+**Goal:** You talk to Jeeves in a web chat; it extracts structured facts into SQLite; you
 can list/query those facts. Proves the whole loop works end-to-end.
 
 **Independent slices:**
@@ -29,7 +29,7 @@ can list/query those facts. Proves the whole loop works end-to-end.
 **Gate command (I run, real keys):**
 ```
 env -u PYTHONPATH .venv/bin/python -c "
-from src.memory import add_message, list_facts
+from jeeves.memory import add_message, list_facts
 r = add_message('I did 3 workouts this week and my goal is a sub-2h half marathon.')
 print('extracted:', len(r['facts']))
 for f in r['facts']: print(' -', f['category'], '|', f['entity'], '|', f['fact_text'][:60])
@@ -53,7 +53,7 @@ editing (Phase 3), categories management UI (Phase 3).
 with cited fact IDs. This is the "Jeeves answers about you" experience.
 
 **Slices:** `memory.ask(question)` (retrieve + compose), `api.py` `/api/ask`,
-UI "Ask Valet" box.
+UI "Ask Jeeves" box.
 
 **Gate:** ask "what is my running goal and how many workouts did I log?" → answer cites the
 facts from Phase 1.

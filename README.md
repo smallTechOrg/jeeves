@@ -1,9 +1,9 @@
-# Valet
+# Jeeves
 
-A Jeeves-style personal memory agent. You tell Valet ordinary things about yourself — "I did
+A Jeeves-style personal memory agent. You tell Jeeves ordinary things about yourself — "I did
 3 workouts this week", "my goal is a sub-2h half marathon" — and it extracts **structured,
 queryable facts** into a relational SQLite database, while Mem0 keeps a semantic memory for
-natural-language recall. Valet is also a demonstration of the *limits of agentic factual
+natural-language recall. Jeeves is also a demonstration of the *limits of agentic factual
 memory*: every extracted fact is shown with its category, the entity it's about, and a
 confidence score, so you can see exactly what the agent decided was true.
 
@@ -26,7 +26,7 @@ cp .env.example .env
 # (the chat + embed model slugs in .env.example are already validated for this account)
 
 # 3. Run
-env -u PYTHONPATH .venv/bin/python -m src.main
+env -u PYTHONPATH .venv/bin/python -m jeeves.main
 # open http://127.0.0.1:8000
 ```
 
@@ -34,7 +34,7 @@ env -u PYTHONPATH .venv/bin/python -m src.main
 > shadow the project's. The server prints its URL on boot.
 
 ## What you can do (Phase 1)
-- **Tell Valet anything** in the chat box → it extracts structured facts (category, entity,
+- **Tell Jeeves anything** in the chat box → it extracts structured facts (category, entity,
   confidence) and stores them.
 - **See captured facts** in the right panel, filterable by text or category.
 - **Query facts directly** via the API: `GET /api/facts?category=Goal&q=marathon`
@@ -53,7 +53,7 @@ memory); Phase 3 adds memory hygiene (verify / conflict / supersede); Phase 4 ad
 and history.
 
 ## Notes on the design
-Mem0 v2 returns only *cleaned memory strings*, not structured fields. So Valet performs its
+Mem0 v2 returns only *cleaned memory strings*, not structured fields. So Jeeves performs its
 **own single-LLM structured extraction** (category / entity / fact / confidence) and mirrors
 that into SQLite — Mem0 handles fuzzy semantic recall. This split is the heart of the
 "limits of factual memory" demo.

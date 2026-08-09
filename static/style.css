@@ -68,3 +68,11 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 0; min-hei
 .verified-tag { font-size: 11px; color: #66bb6a; }
 .fact.status-superseded { opacity: 0.55; }
 .edit-input { width: 100%; box-sizing: border-box; font-size: 13px; padding: 4px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--panel); color: var(--text); }
+
+/* Unified chat: intent badges */
+.answer-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.intent { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 7px; border-radius: 8px; font-weight: 700; }
+.intent-fact { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+.intent-question { background: rgba(88,166,255,0.18); color: #58a6ff; }
+.intent-vent { background: rgba(216,191,216,0.18); color: #d8bfd8; }
+.captured-n { font-size: 11px; color: var(--muted); }

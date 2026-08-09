@@ -1,7 +1,7 @@
-# Valet — Architecture
+# Jeeves — Architecture
 
 ## Overview
-Valet is a Jeeves-style personal memory agent. You feed it ordinary statements about
+Jeeves is a Jeeves-style personal memory agent. You feed it ordinary statements about
 yourself ("I did 3 workouts this week", "my goal is a sub-2h half marathon") and it
 extracts **factual, structured memory** — not just blobs of text. You later ask it
 natural-language questions and it answers from your accumulated facts.
@@ -19,7 +19,7 @@ Assumed (no stack preference was stated — derived from requirements):
 - **Vector store:** Chroma `v1.5.9` (local, LMDB/file-backed — effectively a local DB,
   satisfies "a little vector data", zero external services)
 - **Relational store:** SQLite (the user's hard requirement: "factual data like a
-  relational SQL database"). Valet **mirrors** extracted facts into a structured SQL
+  relational SQL database"). Jeeves **mirrors** extracted facts into a structured SQL
   schema the user can query directly.
 - **Frontend:** Vanilla HTML + JS single-page chat (no build step, served by FastAPI) —
   keeps the scaffold lean and fully local.
@@ -30,7 +30,7 @@ Assumed (no stack preference was stated — derived from requirements):
 ### Why this stack
 - SQLite + Chroma are both file-backed → **nothing leaves the machine** except the
   (validated) NVIDIA API calls for extraction/answering. Matches the privacy posture.
-- Mem0 owns the hard part (turning chatter into facts + semantic search). Valet adds the
+- Mem0 owns the hard part (turning chatter into facts + semantic search). Jeeves adds the
   relational mirror + the UI + the "limits of memory" transparency layer.
 - No Postgres/Docker needed → zero-setup local run, which the user picked.
 
@@ -41,7 +41,7 @@ not a structured fact. `get_all`/`search` return those memories with `memory`, `
 `score`, `created_at`, `user_id`. Mem0 does **semantic recall only** — it abstracts away
 the structured fields the user explicitly wants.
 
-Therefore Valet does its **own structured extraction** in a single LLM call (reusing the
+Therefore Jeeves does its **own structured extraction** in a single LLM call (reusing the
 NVIDIA endpoint): it turns each message into one or more facts `{category, entity,
 fact_text, confidence}`, writes them to SQLite (the relational mirror the user asked for),
 and *also* pushes the message to Mem0 for semantic search. This is the honest design and
@@ -60,7 +60,7 @@ Each extracted fact is a structured record:
   `conflicted` (later info contradicts) | `superseded` (replaced by newer info)
 - `created_at`, `updated_at`
 
-Mem0 keeps its own vector store (for semantic recall). Valet's SQLite is the
+Mem0 keeps its own vector store (for semantic recall). Jeeves's SQLite is the
 **queryable relational mirror** — the artifact the user explicitly asked for. They are
 kept in sync: every Mem0 `add` also writes the parsed facts to SQLite.
 
@@ -95,7 +95,7 @@ valet/
 ## Conventions
 - `.venv` pinned; all runs via `env -u PYTHONPATH .venv/bin/python -m ...`
 - `.env` never committed (gitignored); `.env.example` is the source of truth for vars
-- SQLite DB path from `VALET_DB_PATH` (default `./valet.db`), gitignored
+- SQLite DB path from `JEEVES_DB_PATH` (default `./jeeves.db`), gitignored
 - Mem0's Chroma store lives in `./chroma_store/` (gitignored)
 - One LLM call per artifact (never per-line) — pitfall §7
 - API key value never read or printed in this repo's tooling

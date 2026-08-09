@@ -1,4 +1,4 @@
-"""FastAPI application for Valet (Phase 1: capture + query)."""
+"""FastAPI application for Jeeves (Phase 1: capture + query)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,12 +9,12 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory
 from . import db
-from .schemas import MessageIn, MessageOut, AskIn, FactEditIn
+from .schemas import MessageIn, MessageOut, AskIn, FactEditIn, ChatIn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = REPO_ROOT / "static"
 
-app = FastAPI(title="Valet", version="0.1.0")
+app = FastAPI(title="Jeeves", version="0.1.0")
 
 
 @app.on_event("startup")
@@ -53,6 +53,15 @@ def post_ask(payload: AskIn):
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
     return memory.answer_question(question)
+
+
+@app.post("/api/chat")
+def post_chat(payload: ChatIn):
+    """Unified inbox: classify intent (fact / question / vent) and route accordingly."""
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    return memory.route_message(text)
 
 
 @app.get("/api/summary")

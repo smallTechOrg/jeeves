@@ -1,4 +1,4 @@
-"""Valet server entrypoint."""
+"""Jeeves server entrypoint."""
 from __future__ import annotations
 
 import uvicorn
@@ -9,9 +9,9 @@ from .api import app
 
 def main() -> None:
     uvicorn.run(
-        "src.api:app",
-        host=str(config.VALET_HOST),
-        port=config.VALET_PORT,
+        "jeeves.api:app",
+        host=str(config.JEEVES_HOST),
+        port=config.JEEVES_PORT,
         reload=False,
     )
 

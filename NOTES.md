@@ -1,4 +1,4 @@
-# Valet — Build Journal (harness notes)
+# Jeeves — Build Journal (harness notes)
 
 Run started: 2026-08-09 ~21:49 PT
 
