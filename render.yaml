@@ -1,0 +1,40 @@
+# Render deployment for Jeeves
+# Docs: https://render.com/docs/deploy-fastapi (web service, Dockerfile-less Python)
+#
+# How it works:
+# - Build: pip installs requirements.txt.
+# - Start: uvicorn serves jeeves.api:app (FastAPI) on $PORT.
+# - State lives in Supabase (Postgres + pgvector) — set JEEVES_DB_URL and the
+#   SUPABASE_* vars below. Render's own disk is ephemeral, so DO NOT rely on local
+#   SQLite/Chroma in prod; the app auto-selects Supabase when those env vars are present.
+# - Secrets come from Render's Environment panel (never committed). `.env` is local-only.
+
+services:
+  - type: web
+    name: jeeves
+    runtime: python
+    plan: free
+    region: oregon          # pick the region closest to you
+    branch: feature/valet-20260809-2235-v0.1
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn jeeves.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: JEEVES_DB_URL
+        sync: false          # set in Render dashboard (Supabase pooler / direct URL)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: NVIDIA_CHAT_MODEL
+        value: nvidia/nemotron-3-super-120b-a12b
+      - key: NVIDIA_EMBED_MODEL
+        value: nvidia/nemotron-3-embed-1b
+      - key: JEEVES_TZ
+        sync: false          # e.g. Asia/Kolkata
+      - key: PYTHON_VERSION
+        value: "3.12"
