@@ -90,6 +90,25 @@ def patch_fact(fact_id: int, payload: FactEditIn):
     return {"ok": True, "id": fact_id}
 
 
+@app.delete("/api/facts/{fact_id}")
+def delete_one_fact(fact_id: int):
+    ok = memory.delete_fact(fact_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="fact not found")
+    return {"ok": True, "id": fact_id}
+
+
+@app.delete("/api/facts")
+def delete_many_facts(
+    category: str | None = Query(None),
+    entity: str | None = Query(None),
+    status: str | None = Query(None),
+    q: str | None = Query(None),
+):
+    removed = memory.delete_facts(category=category, entity=entity, status=status, q=q)
+    return {"ok": True, "removed": removed}
+
+
 # Serve the SPA at /
 @app.get("/")
 def index():

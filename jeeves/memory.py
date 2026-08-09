@@ -182,6 +182,7 @@ def add_message(text: str) -> dict:
             unit=f.unit,
             period=f.period,
             fact_date=f.fact_date,
+            fact_time=f.fact_time,
         )
         # Conflict detection: a newer fact that matches an existing active one on
         # (category, entity, period) supersedes the older one. This is the visible
@@ -240,6 +241,22 @@ def edit_fact(
 ) -> bool:
     """Owner-edited correction of a stored fact."""
     return db.update_fact(fact_id, fact_text=fact_text, category=category, entity=entity)
+
+
+def delete_fact(fact_id: int) -> bool:
+    """Permanently remove a single fact."""
+    return db.delete_fact(fact_id)
+
+
+def delete_facts(
+    *,
+    category: Optional[str] = None,
+    entity: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+) -> int:
+    """Bulk delete by the same filters as list_facts. Returns number removed."""
+    return db.delete_facts(category=category, entity=entity, status=status, q=q)
 
 
 def fact_summary() -> dict:

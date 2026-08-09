@@ -6,7 +6,7 @@ recall; this owns precise, filterable, relational fact storage.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS facts (
     unit            TEXT,
     period          TEXT,
     fact_date       TEXT,
+    fact_time       TEXT,
     superseded_by   INTEGER,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
@@ -38,7 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_facts_period   ON facts(category, entity, period)
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return config.local_now().isoformat()
 
 
 def _connect() -> sqlite3.Connection:
@@ -58,6 +59,7 @@ def migrate() -> None:
             ("unit", "TEXT"),
             ("period", "TEXT"),
             ("fact_date", "TEXT"),
+            ("fact_time", "TEXT"),
             ("superseded_by", "INTEGER"),
         ]:
             if col not in existing:
@@ -84,6 +86,7 @@ def insert_fact(
     unit: Optional[str] = None,
     period: Optional[str] = None,
     fact_date: Optional[str] = None,
+    fact_time: Optional[str] = None,
 ) -> int:
     now = _now()
     with _connect() as conn:
@@ -91,11 +94,11 @@ def insert_fact(
             """
             INSERT INTO facts
                 (category, entity, fact_text, confidence, status, source_message, mem0_id,
-                 quantity, unit, period, fact_date, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 quantity, unit, period, fact_date, fact_time, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (category, entity, fact_text, confidence, status, source_message, mem0_id,
-             quantity, unit, period, fact_date, now, now),
+             quantity, unit, period, fact_date, fact_time, now, now),
         )
         return int(cur.lastrowid)
 
@@ -203,6 +206,36 @@ def get_fact(fact_id: int) -> dict | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM facts WHERE id = ?", (fact_id,)).fetchone()
     return dict(row) if row else None
+
+
+def delete_fact(fact_id: int) -> bool:
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
+        return cur.rowcount > 0
+
+
+def delete_facts(
+    *,
+    category: Optional[str] = None,
+    entity: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+) -> int:
+    """Bulk delete by the same filters as list_facts. Returns number deleted."""
+    sql = "DELETE FROM facts WHERE 1=1"
+    params: list = []
+    if category:
+        sql += " AND category = ?"; params.append(category)
+    if entity:
+        sql += " AND entity LIKE ?"; params.append(f"%{entity}%")
+    if status:
+        sql += " AND status = ?"; params.append(status)
+    if q:
+        sql += " AND (fact_text LIKE ? OR entity LIKE ?)"
+        params.append(f"%{q}%"); params.append(f"%{q}%")
+    with _connect() as conn:
+        cur = conn.execute(sql, params)
+        return cur.rowcount
 
 
 def count_facts() -> int:

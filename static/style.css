@@ -76,3 +76,16 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 0; min-hei
 .intent-question { background: rgba(88,166,255,0.18); color: #58a6ff; }
 .intent-vent { background: rgba(216,191,216,0.18); color: #d8bfd8; }
 .captured-n { font-size: 11px; color: var(--muted); }
+
+/* Bulk delete + card selection */
+.bulk-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+.bulk-btn { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--fg); cursor: pointer; }
+.bulk-btn:disabled { opacity: 0.45; cursor: default; }
+.bulk-btn.danger { color: #ff7b72; border-color: #ff7b72; }
+.bulk-btn:not(:disabled):hover { background: var(--accent-soft); }
+.fact-sel { position: absolute; left: 8px; top: 10px; }
+.fact { position: relative; padding-left: 30px; }
+.fact-check { width: 15px; height: 15px; cursor: pointer; }
+.fact-btn.delete { color: #ff7b72; border-color: #ff7b72; }
+.fact-btn.delete:hover { background: rgba(255,123,114,0.12); }

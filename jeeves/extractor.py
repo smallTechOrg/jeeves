@@ -38,10 +38,14 @@ _SYSTEM = (
     "- period: the time window the fact refers to (e.g. 'this week', 'today', '2026-08', "
     "'weekend'), else null.\n"
     "- fact_date: the ISO date (YYYY-MM-DD) the fact is about if clearly stated or "
-    "impliable from 'today/yesterday/last week'. TODAY's date is "
-    + date.today().isoformat()
+    "impliable from 'today/yesterday/last week'. TODAY's date in the owner's time zone ("
+    + config.JEEVES_TZ
+    + ") is "
+    + config.local_now().date().isoformat()
     + " — if the message says 'today' or is a present-tense statement with no other date, "
     "use that. Otherwise null.\n"
+    "- fact_time: the local time of day (HH:MM) the fact refers to if stated or clearly "
+    "impliable (e.g. 'this morning' ~ 09:00, 'tonight' ~ 20:00), else null.\n"
     "ONLY extract a fact when it is a CONCRETE, DURABLE claim the owner would want remembered "
     "later: an action taken, a goal, a preference, a measurement, a plan, a relationship, an "
     "event, a habit, or a stated mood/feeling. If the message is purely transactional chit-chat "
@@ -63,6 +67,7 @@ class ExtractedFact:
     unit: Optional[str] = None
     period: Optional[str] = None
     fact_date: Optional[str] = None
+    fact_time: Optional[str] = None
 
     def to_row(self) -> dict:
         d = asdict(self)
@@ -125,12 +130,17 @@ def extract_facts(message: str) -> list[ExtractedFact]:
             conf = 0.5
         conf = max(0.0, min(1.0, conf))
         fdate = _to_str(item.get("fact_date"))
+        ftime = _to_str(item.get("fact_time"))
         # Default: if the fact clearly refers to today (or is a present-tense statement with
-        # no other date mentioned), stamp it with today's date so time-based queries work.
+        # no other date mentioned), stamp it with the owner's local date/time so time-based
+        # queries work. Uses config.local_now() so "today" is correct in their time zone.
         if not fdate and (period := _to_str(item.get("period"))):
             low = period.lower()
             if low in ("today", "tonight", "this morning", "this evening", "this afternoon"):
-                fdate = date.today().isoformat()
+                now = config.local_now()
+                fdate = now.date().isoformat()
+                if not ftime:
+                    ftime = now.strftime("%H:%M")
         facts.append(ExtractedFact(
             category=cat,
             fact=fact_text,
@@ -140,5 +150,6 @@ def extract_facts(message: str) -> list[ExtractedFact]:
             unit=_to_str(item.get("unit")),
             period=_to_str(item.get("period")),
             fact_date=fdate,
+            fact_time=ftime,
         ))
     return facts

@@ -78,7 +78,8 @@ function renderFacts(facts) {
     if (f.quantity != null && f.unit) attrs.push(`${f.quantity} ${escapeHtml(f.unit)}`);
     else if (f.quantity != null) attrs.push(`${f.quantity}`);
     if (f.period) attrs.push(`<span class="period">${escapeHtml(f.period)}</span>`);
-    if (f.fact_date) attrs.push(`<span class="fdate">${escapeHtml(f.fact_date)}</span>`);
+    const when = [f.fact_date, f.fact_time].filter(Boolean).join(" ");
+    if (when) attrs.push(`<span class="fdate">${escapeHtml(when)}</span>`);
     const attrHtml = attrs.length
       ? `<div class="attrs">` + attrs.map(a => `<span class="attr">${a}</span>`).join("") + `</div>`
       : "";
@@ -89,6 +90,7 @@ function renderFacts(facts) {
       : `<button class="fact-btn verify" data-id="${f.id}">Verify</button>`;
 
     card.innerHTML =
+      `<label class="fact-sel"><input type="checkbox" class="fact-check" data-id="${f.id}"></label>` +
       `<div class="meta">` +
         `<span class="cat">${escapeHtml(f.category)}</span>` +
         ent +
@@ -100,6 +102,7 @@ function renderFacts(facts) {
       `<div class="fact-actions">` +
         verifyBtn +
         `<button class="fact-btn edit" data-id="${f.id}">Edit</button>` +
+        `<button class="fact-btn delete" data-id="${f.id}">Delete</button>` +
       `</div>`;
     factsList.appendChild(card);
   }
@@ -137,6 +140,16 @@ function renderFacts(facts) {
       };
       inputEl.addEventListener("blur", save);
       inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter") inputEl.blur(); });
+    });
+  });
+
+  // per-card delete
+  factsList.querySelectorAll(".fact-btn.delete").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-id");
+      if (!confirm("Delete this fact?")) return;
+      await fetch(`/api/facts/${id}`, { method: "DELETE" });
+      refreshFacts();
     });
   });
 }
@@ -203,7 +216,8 @@ form.addEventListener("submit", async (e) => {
       const label = intent === "feeling" ? "feeling" : "fact";
       addCapturedBubble(data.facts || [], label);
       if (data.answer) {
-        addAnswerBubble(data.answer, data.citations || [], label);
+        // The conversational reply is shown WITHOUT an intent badge — it's just Jeeves talking.
+        addAnswerBubble(data.answer, data.citations || [], null);
       }
     }
     await refreshFacts();
@@ -218,6 +232,51 @@ form.addEventListener("submit", async (e) => {
 
 filterQ.addEventListener("input", debounce(refreshFacts, 250));
 filterCat.addEventListener("change", refreshFacts);
+
+// --- Bulk delete ---
+const deleteSelectedBtn = document.getElementById("delete-selected");
+const deleteAllBtn = document.getElementById("delete-all");
+
+function selectedIds() {
+  return [...factsList.querySelectorAll(".fact-check:checked")].map(c => c.getAttribute("data-id"));
+}
+function syncBulkBar() {
+  deleteSelectedBtn.disabled = selectedIds().length === 0;
+  deleteSelectedBtn.textContent = `Delete selected (${selectedIds().length})`;
+}
+// Re-sync the bulk bar whenever facts re-render (checkboxes are recreated each render).
+const _origRender = renderFacts;
+renderFacts = function (facts) {
+  _origRender(facts);
+  syncBulkBar();
+};
+// Delegate checkbox changes (cards are rebuilt on every refresh).
+factsList.addEventListener("change", (e) => {
+  if (e.target.classList.contains("fact-check")) syncBulkBar();
+});
+
+deleteSelectedBtn.addEventListener("click", async () => {
+  const ids = selectedIds();
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} selected fact(s)?`)) return;
+  for (const id of ids) {
+    await fetch(`/api/facts/${id}`, { method: "DELETE" });
+  }
+  refreshFacts();
+});
+
+deleteAllBtn.addEventListener("click", async () => {
+  const q = filterQ.value.trim();
+  const cat = filterCat.value;
+  const scope = cat ? `in "${cat}"` : (q ? `matching "${q}"` : "ALL");
+  if (!confirm(`Delete ${scope} facts? This cannot be undone.`)) return;
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (cat) params.set("category", cat);
+  const res = await fetch("/api/facts?" + params.toString(), { method: "DELETE" });
+  const data = await res.json();
+  refreshFacts();
+});
 
 function debounce(fn, ms) {
   let t;
