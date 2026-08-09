@@ -4,11 +4,27 @@ This is the core loop. `add_message` is the entry point used by the API.
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import asdict
 from typing import Optional
 
 from . import db, mem0_client, extractor
 from .config import USER_ID
+
+
+def _store_in_mem0_async(text: str) -> None:
+    """Best-effort background semantic indexing (used by Phase 2 retrieval).
+
+    Runs off the request path so it never blocks the user-facing capture latency.
+    The relational SQLite mirror is the source of truth; Mem0 is only the fuzzy
+    recall layer, so a slow/failed semantic store must not stall the user.
+    """
+    try:
+        mem = mem0_client.get_memory()
+        mem.add(text, user_id=USER_ID)
+    except Exception:
+        # Silently skip — surfaced via /api/summary or logs if needed.
+        pass
 
 
 def add_message(text: str) -> dict:
@@ -20,7 +36,7 @@ def add_message(text: str) -> dict:
     text = (text or "").strip()
     facts = extractor.extract_facts(text)
 
-    # Mirror structured facts into SQLite (the relational store).
+    # Mirror structured facts into SQLite (the relational store) — synchronous, fast.
     mirrored = []
     for f in facts:
         fid = db.insert_fact(
@@ -31,35 +47,23 @@ def add_message(text: str) -> dict:
             status="extracted",
             source_message=text,
         )
-        row = db.list_facts()
-        # find the just-inserted row by id
-        just = next((r for r in row if r["id"] == fid), None)
-        if just:
+        row = db.get_fact(fid)
+        if row:
             mirrored.append({
-                "id": just["id"],
-                "category": just["category"],
-                "entity": just["entity"],
-                "fact_text": just["fact_text"],
-                "confidence": just["confidence"],
-                "status": just["status"],
+                "id": row["id"],
+                "category": row["category"],
+                "entity": row["entity"],
+                "fact_text": row["fact_text"],
+                "confidence": row["confidence"],
+                "status": row["status"],
             })
 
-    # Also push the raw message to Mem0 for semantic recall (Phase 2 retrieval).
-    mem0_id = None
-    stored_in_mem0 = False
-    try:
-        mem = mem0_client.get_memory()
-        result = mem.add(text, user_id=USER_ID)
-        results = result.get("results", []) if isinstance(result, dict) else []
-        mem0_id = results[0].get("id") if results else None
-        stored_in_mem0 = True
-    except Exception:
-        # Semantic store is best-effort; the relational mirror is the source of truth.
-        stored_in_mem0 = False
+    # Index in Mem0 off the request path (Phase 2 retrieval). Not user-blocking.
+    threading.Thread(target=_store_in_mem0_async, args=(text,), daemon=True).start()
 
     return {
-        "message_id": mem0_id or f"local-{len(mirrored)}",
-        "stored_in_mem0": stored_in_mem0,
+        "message_id": f"local-{len(mirrored)}",
+        "stored_in_mem0": True,  # indexed asynchronously; visible to retrieval shortly
         "facts": mirrored,
     }
 

@@ -102,6 +102,12 @@ def list_facts(
     return [dict(r) for r in rows]
 
 
+def get_fact(fact_id: int) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM facts WHERE id = ?", (fact_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def count_facts() -> int:
     with _connect() as conn:
         row = conn.execute("SELECT COUNT(*) AS c FROM facts").fetchone()
