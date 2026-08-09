@@ -28,6 +28,27 @@ _MEMORY: Memory | None = None
 def get_memory() -> Memory:
     global _MEMORY
     if _MEMORY is None:
+        # Vector store: Supabase (pgvector) in prod when configured, else local Chroma for dev.
+        if config.MEM0_USE_SUPABASE:
+            vector_store = {
+                "provider": "supabase",
+                "config": {
+                    "connection_string": str(config.JEEVES_DB_URL) if config._IS_POSTGRES else config.SUPABASE_URL,
+                    "collection_name": "jeeves_memories",
+                    "embedding_model_dims": 1024,  # nvidia/nemotron-3-embed-1b dimensionality
+                    "supabase_url": config.SUPABASE_URL,
+                    "supabase_key": config.SUPABASE_KEY,
+                },
+            }
+        else:
+            vector_store = {
+                "provider": "chroma",
+                "config": {
+                    "collection_name": "jeeves_memories",
+                    "path": str(config.CHROMA_PATH),
+                },
+            }
+
         mem0_config = {
             "version": "v1.1",
             "llm": {
@@ -46,13 +67,7 @@ def get_memory() -> Memory:
                     "openai_base_url": config.NVIDIA_BASE_URL,
                 },
             },
-            "vector_store": {
-                "provider": "chroma",
-                "config": {
-                    "collection_name": "valet_memories",
-                    "path": str(config.CHROMA_PATH),
-                },
-            },
+            "vector_store": vector_store,
             "history_db_path": str(config.REPO_ROOT / "mem0_history.db"),
         }
         _MEMORY = Memory.from_config(mem0_config)

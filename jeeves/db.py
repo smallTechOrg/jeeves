@@ -1,76 +1,74 @@
-"""SQLite relational mirror of Jeeves's extracted facts.
+"""Relational store for Jeeves's extracted structured facts.
 
-This is the structured, queryable store the user explicitly asked for. Mem0 owns semantic
-recall; this owns precise, filterable, relational fact storage.
+This is the precise, filterable, queryable store (Mem0 owns fuzzy semantic recall).
+Backed by **SQLAlchemy Core** so the same code runs on SQLite locally and Postgres
+(Supabase) in prod — selected by `config.JEEVES_DB_URL` (`JEEVES_DB_PATH` SQLite
+falls back when no URL is set).
+
+Column types use generic SQLAlchemy types; SQLite/Postgres map them natively.
 """
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
+
+from sqlalchemy import (
+    MetaData, Table, Column, Integer, String, Float,
+    select, insert, update, delete, text as sa_text, func,
+)
 
 from . import config
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS facts (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    category        TEXT NOT NULL,
-    entity          TEXT,
-    fact_text       TEXT NOT NULL,
-    confidence      REAL NOT NULL DEFAULT 0.5,
-    status          TEXT NOT NULL DEFAULT 'extracted',
-    source_message  TEXT,
-    mem0_id         TEXT,
-    quantity        REAL,
-    unit            TEXT,
-    period          TEXT,
-    fact_date       TEXT,
-    fact_time       TEXT,
-    superseded_by   INTEGER,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category);
-CREATE INDEX IF NOT EXISTS idx_facts_status   ON facts(status);
-CREATE INDEX IF NOT EXISTS idx_facts_entity   ON facts(entity);
-CREATE INDEX IF NOT EXISTS idx_facts_period   ON facts(category, entity, period);
-"""
+_metadata = MetaData()
 
+facts = Table(
+    "facts", _metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("category", String, nullable=False),
+    Column("entity", String, nullable=True),
+    Column("fact_text", String, nullable=False),
+    Column("confidence", Float, nullable=False, server_default="0.5"),
+    Column("status", String, nullable=False, server_default="extracted"),
+    Column("source_message", String, nullable=True),
+    Column("mem0_id", String, nullable=True),
+    Column("quantity", Float, nullable=True),
+    Column("unit", String, nullable=True),
+    Column("period", String, nullable=True),
+    Column("fact_date", String, nullable=True),
+    Column("fact_time", String, nullable=True),
+    Column("superseded_by", Integer, nullable=True),
+    Column("created_at", String, nullable=False),
+    Column("updated_at", String, nullable=True),
+)
 
+# Mirror of the legacy local-now for created/updated stamps (tz-aware, owner's local tz).
 def _now() -> str:
     return config.local_now().isoformat()
 
 
-def _connect() -> sqlite3.Connection:
-    Path(config.JEEVES_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(config.JEEVES_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+def init_db() -> None:
+    """Create the schema if it doesn't exist. Idempotent (boot gate)."""
+    _metadata.create_all(config.ENGINE)
+    # Ensure columns added after initial creation exist (covers upgrades on an existing DB).
+    migrate()
 
 
 def migrate() -> None:
-    """Add derived/conflict columns to an existing facts table without losing data."""
-    with _connect() as conn:
-        existing = {r["name"] for r in conn.execute("PRAGMA table_info(facts)").fetchall()}
-        for col, ddl in [
-            ("quantity", "REAL"),
-            ("unit", "TEXT"),
-            ("period", "TEXT"),
-            ("fact_date", "TEXT"),
-            ("fact_time", "TEXT"),
-            ("superseded_by", "INTEGER"),
-        ]:
-            if col not in existing:
-                conn.execute(f"ALTER TABLE facts ADD COLUMN {col} {ddl}")
+    """Add any columns missing on an existing table (SQLite only; Postgres create_all covers it)."""
+    if not config.ENGINE.dialect.name.startswith("sqlite"):
+        return
+    with config.ENGINE.connect() as conn:
+        existing = {r[1] for r in conn.execute(sa_text("PRAGMA table_info(facts)")).fetchall()}
+    for col in ["quantity", "unit", "period", "fact_date", "fact_time", "superseded_by"]:
+        if col not in existing:
+            with config.ENGINE.begin() as conn:
+                conn.execute(sa_text(f"ALTER TABLE facts ADD COLUMN {col} {_SQLITE_COLTYPE[col]}"))
 
 
-def init_db() -> None:
-    """Create the schema if it doesn't exist. Idempotent (boot gate)."""
-    with _connect() as conn:
-        conn.executescript(_SCHEMA)
-    migrate()
+_SQLITE_COLTYPE = {
+    "quantity": "REAL", "unit": "TEXT", "period": "TEXT",
+    "fact_date": "TEXT", "fact_time": "TEXT", "superseded_by": "INTEGER",
+}
 
 
 def insert_fact(
@@ -89,18 +87,17 @@ def insert_fact(
     fact_time: Optional[str] = None,
 ) -> int:
     now = _now()
-    with _connect() as conn:
-        cur = conn.execute(
-            """
-            INSERT INTO facts
-                (category, entity, fact_text, confidence, status, source_message, mem0_id,
-                 quantity, unit, period, fact_date, fact_time, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (category, entity, fact_text, confidence, status, source_message, mem0_id,
-             quantity, unit, period, fact_date, fact_time, now, now),
+    with config.ENGINE.begin() as conn:
+        result = conn.execute(
+            insert(facts).values(
+                category=category, entity=entity, fact_text=fact_text,
+                confidence=confidence, status=status, source_message=source_message,
+                mem0_id=mem0_id, quantity=quantity, unit=unit, period=period,
+                fact_date=fact_date, fact_time=fact_time,
+                created_at=now, updated_at=now,
+            )
         )
-        return int(cur.lastrowid)
+        return int(result.inserted_primary_key[0])
 
 
 def update_fact(
@@ -112,63 +109,52 @@ def update_fact(
     confidence: Optional[float] = None,
     status: Optional[str] = None,
 ) -> bool:
-    fields = []
-    params: list = []
+    fields = {}
     if fact_text is not None:
-        fields.append("fact_text = ?"); params.append(fact_text)
+        fields["fact_text"] = fact_text
     if category is not None:
-        fields.append("category = ?"); params.append(category)
+        fields["category"] = category
     if entity is not None:
-        fields.append("entity = ?"); params.append(entity)
+        fields["entity"] = entity
     if confidence is not None:
-        fields.append("confidence = ?"); params.append(confidence)
+        fields["confidence"] = confidence
     if status is not None:
-        fields.append("status = ?"); params.append(status)
+        fields["status"] = status
     if not fields:
         return False
-    fields.append("updated_at = ?"); params.append(_now())
-    params.append(fact_id)
-    with _connect() as conn:
-        cur = conn.execute(f"UPDATE facts SET {', '.join(fields)} WHERE id = ?", params)
-        return cur.rowcount > 0
+    fields["updated_at"] = _now()
+    with config.ENGINE.begin() as conn:
+        result = conn.execute(
+            update(facts).where(facts.c.id == fact_id).values(**fields)
+        )
+        return result.rowcount > 0
 
 
 def supersede_fact(old_id: int, new_id: int) -> None:
-    with _connect() as conn:
+    with config.ENGINE.begin() as conn:
         conn.execute(
-            "UPDATE facts SET status = 'superseded', superseded_by = ?, updated_at = ? WHERE id = ?",
-            (new_id, _now(), old_id),
+            update(facts)
+            .where(facts.c.id == old_id)
+            .values(status="superseded", superseded_by=new_id, updated_at=_now())
         )
 
 
 def facts_by_key(category: str, entity: Optional[str], period: Optional[str]) -> list[dict]:
-    """Find active facts that a new fact likely conflicts with.
+    """Find active facts a new fact likely conflicts with.
 
     Matching strategy (entity assignment from the LLM is noisy, so we don't require it):
-    - If the new fact has a period, match on (category, period) — two "Workout / this week"
-      statements are the same metric and should supersede.
+    - If the new fact has a period, match on (category, period).
     - Else if it has an entity, match on (category, entity).
     - Else match on category alone (weaker, still surfaces likely conflicts).
     """
-    with _connect() as conn:
-        if period:
-            rows = conn.execute(
-                "SELECT * FROM facts WHERE category = ? AND period = ? "
-                "AND status IN ('extracted','active','verified')",
-                (category, period),
-            ).fetchall()
-        elif entity:
-            rows = conn.execute(
-                "SELECT * FROM facts WHERE category = ? AND entity = ? "
-                "AND status IN ('extracted','active','verified')",
-                (category, entity),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM facts WHERE category = ? "
-                "AND status IN ('extracted','active','verified')",
-                (category,),
-            ).fetchall()
+    stmt = select(facts).where(facts.c.category == category)
+    if period:
+        stmt = stmt.where(facts.c.period == period)
+    elif entity:
+        stmt = stmt.where(facts.c.entity == entity)
+    stmt = stmt.where(facts.c.status.in_(["extracted", "active", "verified"]))
+    with config.ENGINE.connect() as conn:
+        rows = conn.execute(stmt).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -180,38 +166,31 @@ def list_facts(
     q: Optional[str] = None,
     limit: int = 200,
 ) -> list[dict]:
-    sql = "SELECT * FROM facts WHERE 1=1"
-    params: list = []
+    stmt = select(facts)
     if category:
-        sql += " AND category = ?"
-        params.append(category)
+        stmt = stmt.where(facts.c.category == category)
     if entity:
-        sql += " AND entity LIKE ?"
-        params.append(f"%{entity}%")
+        stmt = stmt.where(facts.c.entity.like(f"%{entity}%"))
     if status:
-        sql += " AND status = ?"
-        params.append(status)
+        stmt = stmt.where(facts.c.status == status)
     if q:
-        sql += " AND (fact_text LIKE ? OR entity LIKE ?)"
-        params.append(f"%{q}%")
-        params.append(f"%{q}%")
-    sql += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
-    with _connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
+        stmt = stmt.where(facts.c.fact_text.like(f"%{q}%") | facts.c.entity.like(f"%{q}%"))
+    stmt = stmt.order_by(facts.c.created_at.desc()).limit(limit)
+    with config.ENGINE.connect() as conn:
+        rows = conn.execute(stmt).mappings().all()
     return [dict(r) for r in rows]
 
 
 def get_fact(fact_id: int) -> dict | None:
-    with _connect() as conn:
-        row = conn.execute("SELECT * FROM facts WHERE id = ?", (fact_id,)).fetchone()
+    with config.ENGINE.connect() as conn:
+        row = conn.execute(select(facts).where(facts.c.id == fact_id)).mappings().first()
     return dict(row) if row else None
 
 
 def delete_fact(fact_id: int) -> bool:
-    with _connect() as conn:
-        cur = conn.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
-        return cur.rowcount > 0
+    with config.ENGINE.begin() as conn:
+        result = conn.execute(delete(facts).where(facts.c.id == fact_id))
+        return result.rowcount > 0
 
 
 def delete_facts(
@@ -222,31 +201,29 @@ def delete_facts(
     q: Optional[str] = None,
 ) -> int:
     """Bulk delete by the same filters as list_facts. Returns number deleted."""
-    sql = "DELETE FROM facts WHERE 1=1"
-    params: list = []
+    stmt = delete(facts)
     if category:
-        sql += " AND category = ?"; params.append(category)
+        stmt = stmt.where(facts.c.category == category)
     if entity:
-        sql += " AND entity LIKE ?"; params.append(f"%{entity}%")
+        stmt = stmt.where(facts.c.entity.like(f"%{entity}%"))
     if status:
-        sql += " AND status = ?"; params.append(status)
+        stmt = stmt.where(facts.c.status == status)
     if q:
-        sql += " AND (fact_text LIKE ? OR entity LIKE ?)"
-        params.append(f"%{q}%"); params.append(f"%{q}%")
-    with _connect() as conn:
-        cur = conn.execute(sql, params)
-        return cur.rowcount
+        stmt = stmt.where(facts.c.fact_text.like(f"%{q}%") | facts.c.entity.like(f"%{q}%"))
+    with config.ENGINE.begin() as conn:
+        result = conn.execute(stmt)
+        return result.rowcount
 
 
 def count_facts() -> int:
-    with _connect() as conn:
-        row = conn.execute("SELECT COUNT(*) AS c FROM facts").fetchone()
-        return int(row["c"]) if row else 0
+    with config.ENGINE.connect() as conn:
+        row = conn.execute(select(func.count()).select_from(facts)).first()
+    return int(row[0]) if row else 0
 
 
 def distinct_categories() -> list[str]:
-    with _connect() as conn:
+    with config.ENGINE.connect() as conn:
         rows = conn.execute(
-            "SELECT DISTINCT category FROM facts ORDER BY category"
+            select(facts.c.category).distinct().order_by(facts.c.category)
         ).fetchall()
-    return [r["category"] for r in rows]
+    return [r[0] for r in rows]
