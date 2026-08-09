@@ -191,7 +191,7 @@ def _relevance(q_tokens: set[str], text: str) -> float:
     return overlap / (len(q_tokens) ** 0.5) + overlap / (len(toks) ** 0.5)
 
 
-def ask(question: str) -> dict:
+def ask(question: str, session_context: str = "") -> dict:
     """Answer a question grounded in retrieved facts. Returns {answer, citations}."""
     question = (question or "").strip()
     facts = retrieve(question)
@@ -209,7 +209,17 @@ def ask(question: str) -> dict:
         + f") {f.fact_text}"
         for i, f in enumerate(facts)
     )
-    user_msg = f"MEMORY FACTS:\n{fact_block}\n\nQUESTION: {question}\n\nAnswer using only the facts above."
+    ctx_block = (
+        f"\nCONVERSATION CONTEXT (what we've been discussing):\n{session_context}\n"
+        if session_context else ""
+    )
+    user_msg = (
+        f"MEMORY FACTS:\n{fact_block}\n"
+        f"{ctx_block}\n"
+        f"QUESTION: {question}\n\n"
+        "Answer using only the facts above."
+        + (" If the question is ambiguous, use the conversation context to disambiguate." if ctx_block else "")
+    )
 
     client = OpenAI(api_key=config.NVIDIA_API_KEY, base_url=config.NVIDIA_BASE_URL, timeout=90)
     resp = client.chat.completions.create(

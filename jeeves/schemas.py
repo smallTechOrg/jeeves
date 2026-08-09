@@ -35,4 +35,5 @@ class FactEditIn(BaseModel):
 
 class ChatIn(BaseModel):
     text: str
+    session_id: str | None = None
 

@@ -11,7 +11,7 @@ from typing import Optional
 
 from openai import OpenAI
 
-from . import db, mem0_client, extractor, ask as ask_module
+from . import db, mem0_client, extractor, ask as ask_module, context as ctx
 from .config import USER_ID, NVIDIA_API_KEY, NVIDIA_BASE_URL, NVIDIA_CHAT_MODEL
 
 _QUESTION_RE = re.compile(
@@ -33,28 +33,35 @@ def _looks_like_question(text: str) -> bool:
     return bool(_QUESTION_RE.match(t))
 
 
-def route_message(text: str) -> dict:
+def route_message(text: str, session_id: Optional[str] = None) -> dict:
     """Single-box entry point: classify intent and dispatch to the right behavior.
 
-    Returns { intent, answer?, facts?, citations?, stored }.
+    Returns { intent, answer?, facts?, citations?, stored, session_id, topic }.
     - question: heuristic (trailing '?' or question-word start) -> answer from memory.
     - fact / feeling: everything else is remembered (stored), then Jeeves replies as a
       proactive, conversational valet — acknowledges what it noted, offers a grounded
       suggestion drawn from prior memory, and asks an open question to keep you talking.
 
-    Intent is decided from the EXTRACTION result (already a trusted signal): a message that
-    yields extractable facts/findings is stored; a question is answered instead.
+    `session_id` (optional) carries the rolling conversation thread so Jeeves can refer
+    back to what you were just discussing ("what about tomorrow?").
     """
     text = (text or "").strip()
 
     if _looks_like_question(text):
-        result = ask_module.ask(text)
+        result = ask_module.ask(text, session_context=ctx.get_context(session_id) if session_id else "")
+        answer = result.get("answer")
+        if session_id:
+            ctx.append_turn(session_id, "user", text)
+            if answer:
+                ctx.append_turn(session_id, "jeeves", answer)
         return {
             "intent": "question",
-            "answer": result.get("answer"),
+            "answer": answer,
             "facts": [],
             "citations": result.get("citations", []),
             "stored": False,
+            "session_id": session_id,
+            "topic": ctx.get_topic(session_id) if session_id else "",
         }
 
     # Everything else is memory to keep. The extractor pulls structured facts AND
@@ -65,13 +72,19 @@ def route_message(text: str) -> dict:
     capture = add_message(text)
     captured = capture.get("facts", [])
     intent = "feeling" if (facts and any((f.category or "").lower() in ("mood", "feeling", "emotion", "state") for f in facts)) else "fact"
-    reply = _companion_reply(text, captured, facts)
+    thread = ctx.get_context(session_id) if session_id else ""
+    reply = _companion_reply(text, captured, facts, thread=thread)
+    if session_id:
+        ctx.append_turn(session_id, "user", text)
+        ctx.append_turn(session_id, "jeeves", reply)
     return {
         "intent": intent,
         "answer": reply,
         "facts": captured,
         "citations": embedded.get("citations", []) if embedded else [],
         "stored": True,
+        "session_id": session_id,
+        "topic": ctx.get_topic(session_id) if session_id else "",
     }
 
 
@@ -107,26 +120,33 @@ def _strip_meta(text: str) -> str:
     return text[:cut].strip()
 
 
-def _companion_reply(user_text: str, captured_facts: list[dict], extracted: list) -> str:
-    """Warm, proactive valet reply after storing a message — kept short and curteously Jeeves."""
+def _companion_reply(user_text: str, captured_facts: list[dict], extracted: list, thread: str = "") -> str:
+    """Warm, proactive valet reply after storing a message — kept short and curtly Jeeves.
+
+    `thread` is the rolling conversation context (topic + recent turns) so Jeeves can
+    stay on-thread and refer back to what you were just discussing.
+    """
     if not NVIDIA_API_KEY:
         return "Noted, sir. Anything you'd like help with?"
     # Pull a little related memory to ground the suggestion.
-    context = ""
+    memory_ctx = ""
     try:
         recent = db.list_facts(limit=20)
         recent = [f for f in recent if f.get("status") != "superseded"]
         if recent:
             lines = "\n".join(f"- {f['fact_text']}" for f in recent[:12])
-            context = "WHAT YOU REMEMBER ABOUT THE OWNER:\n" + lines + "\n"
+            memory_ctx = "WHAT YOU REMEMBER ABOUT THE OWNER:\n" + lines + "\n"
     except Exception:
         pass
+    context = (thread + "\n") if thread else ""
     just_stored = "; ".join(f.get("fact_text", "") for f in captured_facts) or user_text
     prompt = (
-        f"{context}\n"
+        f"{context}"
+        f"{memory_ctx}"
         f"OWNER: {user_text}\n"
         f"(You noted: {just_stored})\n\n"
-        "Reply as Jeeves — one or two curt, courteous sentences."
+        "Reply as Jeeves — one or two curt, courteous sentences. If the conversation so far "
+        "has a clear thread, acknowledge it naturally so you stay on-topic."
     )
     client = OpenAI(api_key=NVIDIA_API_KEY, base_url=NVIDIA_BASE_URL, timeout=60)
     try:

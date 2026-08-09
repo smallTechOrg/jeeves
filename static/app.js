@@ -8,6 +8,17 @@ const filterQ = document.getElementById("filter-q");
 const filterCat = document.getElementById("filter-cat");
 const summaryEl = document.getElementById("summary");
 
+// Stable per-browser conversation session so Jeeves can carry context across messages.
+function getSessionId() {
+  let s = localStorage.getItem("jeeves_session");
+  if (!s) {
+    s = "sess-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem("jeeves_session", s);
+  }
+  return s;
+}
+const SESSION_ID = getSessionId();
+
 function addBubble(text, kind) {
   const b = document.createElement("div");
   b.className = "bubble " + (kind || "sys");
@@ -198,7 +209,7 @@ form.addEventListener("submit", async (e) => {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, session_id: SESSION_ID }),
     });
     const data = await res.json();
     // replace the "Thinking…" bubble
@@ -220,6 +231,9 @@ form.addEventListener("submit", async (e) => {
         addAnswerBubble(data.answer, data.citations || [], null);
       }
     }
+    // surface the rolling conversation topic so the user sees Jeeves is following the thread
+    const topicEl = document.getElementById("topic-chip");
+    if (topicEl && data.topic) topicEl.textContent = "Topic: " + data.topic;
     await refreshFacts();
   } catch (err) {
     addBubble("Error: " + err.message, "sys");

@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory
 from . import db
+from . import context
 from .schemas import MessageIn, MessageOut, AskIn, FactEditIn, ChatIn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -61,7 +62,24 @@ def post_chat(payload: ChatIn):
     text = (payload.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
-    return memory.route_message(text)
+    return memory.route_message(text, session_id=payload.session_id)
+
+
+@app.get("/api/sessions/{session_id}/context")
+def get_session_context(session_id: str):
+    """Inspect the rolling conversation context (topic + recent turns)."""
+    return {
+        "session_id": session_id,
+        "topic": context.get_topic(session_id),
+        "turns": context.get_session(session_id)["turns"],
+    }
+
+
+@app.post("/api/sessions/{session_id}/reset")
+def reset_session_context(session_id: str):
+    """Clear the rolling conversation context for a session."""
+    context.reset_session(session_id)
+    return {"ok": True, "session_id": session_id}
 
 
 @app.get("/api/summary")
