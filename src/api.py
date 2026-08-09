@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory
 from . import db
-from .schemas import MessageIn, MessageOut
+from .schemas import MessageIn, MessageOut, AskIn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = REPO_ROOT / "static"
@@ -45,6 +45,14 @@ def get_facts(
     limit: int = Query(200, ge=1, le=1000),
 ):
     return memory.list_facts(category=category, entity=entity, status=status, q=q, limit=limit)
+
+
+@app.post("/api/ask")
+def post_ask(payload: AskIn):
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+    return memory.answer_question(question)
 
 
 @app.get("/api/summary")

@@ -8,8 +8,13 @@ import threading
 from dataclasses import asdict
 from typing import Optional
 
-from . import db, mem0_client, extractor
+from . import db, mem0_client, extractor, ask as ask_module
 from .config import USER_ID
+
+
+def answer_question(question: str) -> dict:
+    """Phase 2: grounded answer over retrieved memory."""
+    return ask_module.ask(question)
 
 
 def _store_in_mem0_async(text: str) -> None:

@@ -16,6 +16,24 @@ function addBubble(text, kind) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+function addAnswerBubble(answer, citations) {
+  const b = document.createElement("div");
+  b.className = "bubble answer";
+  const p = document.createElement("div");
+  p.className = "answer-text";
+  p.textContent = answer;
+  b.appendChild(p);
+  if (citations && citations.length) {
+    const c = document.createElement("div");
+    c.className = "citations";
+    c.textContent = "↳ from " + citations.length + " fact" + (citations.length === 1 ? "" : "s") +
+      ": " + citations.map(x => x.category).join(", ");
+    b.appendChild(c);
+  }
+  messagesEl.appendChild(b);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
 function renderFacts(facts) {
   factsList.innerHTML = "";
   if (!facts.length) {
@@ -111,6 +129,40 @@ form.addEventListener("submit", async (e) => {
 
 filterQ.addEventListener("input", debounce(refreshFacts, 250));
 filterCat.addEventListener("change", refreshFacts);
+
+// --- Ask Valet ---
+const askInput = document.getElementById("ask-input");
+const askBtn = document.getElementById("ask-btn");
+
+async function doAsk() {
+  const q = askInput.value.trim();
+  if (!q) return;
+  addBubble(q, "user");
+  askInput.value = "";
+  askBtn.disabled = true;
+  askInput.disabled = true;
+  addBubble("Thinking…", "sys");
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q }),
+    });
+    const data = await res.json();
+    const bubbles = messagesEl.querySelectorAll(".bubble.sys");
+    const last = bubbles[bubbles.length - 1];
+    if (last) last.remove();
+    addAnswerBubble(data.answer, data.citations || []);
+  } catch (err) {
+    addBubble("Error: " + err.message, "sys");
+  } finally {
+    askBtn.disabled = false;
+    askInput.disabled = false;
+    askInput.focus();
+  }
+}
+askBtn.addEventListener("click", doAsk);
+askInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAsk(); });
 
 function debounce(fn, ms) {
   let t;

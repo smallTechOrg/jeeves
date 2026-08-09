@@ -25,10 +25,18 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 0; min-hei
 .bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; font-size: 14px; }
 .bubble.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid var(--accent); }
 .bubble.sys { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+.bubble.answer { align-self: flex-start; background: var(--accent-soft); border: 1px solid var(--accent); max-width: 90%; }
+.bubble.answer .answer-text { font-size: 14px; line-height: 1.5; }
+.bubble.answer .citations { margin-top: 8px; font-size: 11px; color: var(--accent); border-top: 1px solid var(--border); padding-top: 6px; }
 .composer { display: flex; gap: 8px; padding: 14px; border-top: 1px solid var(--border); }
 .composer input { flex: 1; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
 .composer button { background: var(--accent); color: white; border: none; padding: 0 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .composer button:disabled { opacity: 0.5; cursor: default; }
+
+.ask-box { display: flex; gap: 8px; padding: 12px 14px 0; border-top: 1px solid var(--border); }
+.ask-box input { flex: 1; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.ask-box button { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 0 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.ask-box button:disabled { opacity: 0.5; cursor: default; }
 .facts-panel { display: flex; flex-direction: column; min-height: 0; }
 .facts-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .facts-header h2 { margin: 0 0 10px; font-size: 15px; }
