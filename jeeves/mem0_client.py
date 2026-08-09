@@ -29,6 +29,9 @@ def get_memory() -> Memory:
     global _MEMORY
     if _MEMORY is None:
         # Vector store: Supabase (pgvector) in prod when configured, else local Chroma for dev.
+        # If a Supabase init fails we fall back to Chroma so the app still boots — only the
+        # *semantic* recall layer degrades; relational facts (your durable memory) still land
+        # in Supabase Postgres via SQLAlchemy.
         if config.MEM0_USE_SUPABASE:
             vector_store = {
                 "provider": "supabase",
@@ -70,5 +73,20 @@ def get_memory() -> Memory:
             "vector_store": vector_store,
             "history_db_path": str(config.REPO_ROOT / "mem0_history.db"),
         }
-        _MEMORY = Memory.from_config(mem0_config)
+        try:
+            _MEMORY = Memory.from_config(mem0_config)
+        except Exception as exc:  # noqa: BLE001 — never let Mem0 config break the whole app
+            if config.MEM0_USE_SUPABASE:
+                # Supabase vector store failed; degrade to local Chroma for semantic recall.
+                print(
+                    f"[jeeves] WARNING: Mem0 Supabase init failed ({exc!r}); "
+                    "falling back to local Chroma for semantic recall only. "
+                    "Relational facts still persist in Supabase Postgres."
+                )
+                _MEMORY = Memory.from_config({**mem0_config, "vector_store": {
+                    "provider": "chroma",
+                    "config": {"collection_name": "jeeves_memories", "path": str(config.CHROMA_PATH)},
+                }})
+            else:
+                raise
     return _MEMORY
